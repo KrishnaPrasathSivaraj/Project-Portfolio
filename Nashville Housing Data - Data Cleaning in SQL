@@ -1,0 +1,144 @@
+select * from NashvilleHousing
+---------------------------------------------------------------------------------------------
+--standardize date format
+select SaleDateConverted, convert(date,SaleDate)
+from NashvilleHousing
+
+update NashvilleHousing
+SET SaleDate = convert(date,SaleDate)
+
+Alter Table NashvilleHousing 
+add SaleDateConverted date;
+
+update  NashvilleHousing 
+SET SaleDateConverted = convert(date,SaleDate)
+------------------------------------------------------------------------------------------------------------------
+--Populate property address
+select *
+from NashvilleHousing
+--where propertyAddress is null
+order by parcelID
+
+select a.parcelID,a.propertyAddress,b.parcelID,b.propertyAddress, ISNULL(a.propertyAddress,b.propertyAddress)
+from NashvilleHousing a
+join NashvilleHousing b
+on a.parcelID=b.ParcelID
+and a.uniqueID <> b.uniqueID
+where a.propertyAddress is null
+
+update a
+set propertyAddress = ISNULL(a.propertyAddress,b.propertyAddress)
+from NashvilleHousing a
+join NashvilleHousing b
+on a.parcelID=b.ParcelID
+and a.uniqueID <> b.uniqueID
+where a.propertyAddress is null
+------------------------------------------------------------------------------------------------------------------
+--Breaking address into individual Columns (Address,city,state)
+
+select propertyaddress
+from NashvilleHousing
+--where propertyAddress is null
+order by parcelID
+
+select substring(propertyAddress,1, charindex(',',propertyAddress)-1) as address
+, substring(propertyAddress,charindex(',',propertyAddress)+1,len(propertyAddress)) as address
+
+from NashvilleHousing
+
+Alter Table NashvilleHousing 
+add propertysplitaddress Nvarchar(255);
+
+update  NashvilleHousing 
+SET propertysplitaddress = substring(propertyAddress,1, charindex(',',propertyAddress)-1)
+
+Alter Table NashvilleHousing 
+add propertysplitcity Nvarchar(255);
+
+update  NashvilleHousing 
+SET propertysplitcity = substring(propertyAddress,charindex(',',propertyAddress)+1,len(propertyAddress))
+
+select * from NashvilleHousing 
+
+
+select owneraddress
+from NashvilleHousing 
+
+--using parsename for above process --easy compared to substring
+
+select 
+parsename(replace(OwnerAddress,',','.'),3)
+,parsename(replace(OwnerAddress,',','.'),2)
+,parsename(replace(OwnerAddress,',','.'),1)
+from NashvilleHousing 
+
+
+Alter Table NashvilleHousing 
+add ownersplitaddress Nvarchar(255);
+
+update  NashvilleHousing 
+SET ownersplitaddress = parsename(replace(OwnerAddress,',','.'),3)
+
+Alter Table NashvilleHousing 
+add ownersplitcity Nvarchar(255);
+
+update  NashvilleHousing 
+SET propertysplitcity = parsename(replace(OwnerAddress,',','.'),2)
+
+Alter Table NashvilleHousing 
+add ownersplitstate Nvarchar(255);
+
+update  NashvilleHousing 
+SET ownersplitstate = parsename(replace(OwnerAddress,',','.'),1)
+
+select * from NashvilleHousing 
+
+--------------------------------------------------------------------------------------------------------------------
+--change Y and N to Yes and No in "Solad as Vacant"
+
+select distinct(SoldAsVacant),count(SoldAsVacant)
+from NashvilleHousing
+group by SoldAsVacant
+order by 2
+
+
+
+Select soldasvacant
+,CASE when soldasvacant = 'Y' then'Yes'
+      when soldasvacant = 'N' then 'No'
+	  else Soldasvacant
+	  END
+from NashvilleHousing
+
+update NashvilleHousing
+ SET Soldasvacant = CASE when soldasvacant = 'Y' then'Yes'
+      when soldasvacant = 'N' then 'No'
+	  else Soldasvacant
+	  END
+
+-----------------------------------------------------------------------------------------------
+	  --Remove Duplicates
+	  with RownumCTE AS(
+	  select * ,
+	  ROW_NUMBER() over (
+	  PARTITION BY parcelID,
+	               propertyaddress,
+	               Saleprice,
+				   SaleDate,
+				   LegalReference
+				   order by  
+				   UniqueID
+				   )row_num
+       from NashvilleHousing
+	  -- order by parcelID
+	   )
+	   delete
+	   FROM RownumCTE
+	   where row_num>1
+	 
+
+	-- delete unused columns
+	select * from NashvilleHousing 
+
+	alter table  NashvilleHousing 
+	drop column SaleDate

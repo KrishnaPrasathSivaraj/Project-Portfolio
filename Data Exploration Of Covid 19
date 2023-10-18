@@ -1,1 +1,109 @@
+select * from [Covid Exploration]..CovidDeaths
+where continent is not NULL
+order by 3,4
 
+select * from [Covid Exploration]..CovidVaccinations
+order by 3,4
+
+select location,date,total_cases,new_cases,total_deaths ,population
+ from [Covid Exploration]..CovidDeaths
+ order by 1,2
+  
+  --Total Cases vs Total Deaths
+  --Likelihood of dying if you contract covid in your country
+
+  select location,date,total_cases,total_deaths ,(total_deaths/total_cases)*100 as Deathpercentage
+ from [Covid Exploration]..CovidDeaths
+ where location like '%states%'
+ and continent is not NULL
+ order by 1,2
+
+ --looking at Total cases vs population
+ --shows what percentage of population got covid
+
+ select location,date,total_cases,population ,(total_cases/population)*100 as PercentPopulationInfected
+ from [Covid Exploration]..CovidDeaths
+ where location like '%states%'
+ order by 1,2
+
+ --Countries with highest Infections rate compared to population
+
+ select location,population,max(total_cases) as HighestInfectionCount, max((total_cases/population))*100 as PercentPopulationInfected
+ from [Covid Exploration]..CovidDeaths
+ --where location like '%India%'
+ group by location,population
+ order by PercentPopulationInfected desc
+
+
+ --Showing countries with highest Deaths Count per population
+ select location,max(cast(total_deaths as int)) as TotaltdeathCount
+ from [Covid Exploration]..CovidDeaths
+ where continent is not NULL
+ group by location
+ order by TotaltdeathCount desc
+
+  --Showing Continents with highest Deaths Count per population
+ select continent,max(cast(total_deaths as int)) as TotaltdeathCount
+ from [Covid Exploration]..CovidDeaths
+ where continent is not NULL
+ group by continent
+ order by TotaltdeathCount desc
+
+ --Global numbers
+ select sum(new_cases) as totalcases,sum(cast(new_deaths as int)) as totaldeaths,sum(cast(new_deaths as int))/sum(new_cases)*100 as DeathPercentage
+ from [Covid Exploration]..CovidDeaths
+ where continent is not NULL
+ --group by date
+ order by 1,2
+
+ --Total population VS Vaccinations --Using CTE
+  With population_VS_Vaccination (continent,location,date,population,new_vaccinations,RollingpeopleVaccinated)
+ as 
+ (
+ select da.continent,da.location, da.date,da.population ,va.new_vaccinations,
+ sum(convert(int,va.new_vaccinations)) over (partition by da.location order by da.date) as RollingpeopleVaccinated
+ from [Covid Exploration]..CovidDeaths da
+ join [Covid Exploration]..CovidVaccinations va
+ on da.location = va.location and da.date = va.date
+ where da.continent is not NULL
+
+)
+select *, (RollingpeopleVaccinated/ population)*100
+from population_VS_Vaccination
+
+-- Temp table
+
+drop table if exists #PercentPopulationVaccinated
+Create Table #PercentPopulationVaccinated
+(
+Continent nvarchar(255),
+Location nvarchar(255),
+Date datetime,
+population numeric,
+New_Vaccinations numeric,
+RollingPeopleVaccinated numeric
+)
+
+Insert into #PercentPopulationVaccinated
+ select da.continent,da.location, da.date,da.population ,va.new_vaccinations,
+ sum(convert(int,va.new_vaccinations)) over (partition by da.location order by da.date) as RollingpeopleVaccinated
+ from [Covid Exploration]..CovidDeaths da
+ join [Covid Exploration]..CovidVaccinations va
+ on da.location = va.location and da.date = va.date
+ --where da.continent is not NULL
+
+select *, (RollingpeopleVaccinated/ population)*100
+from  #PercentPopulationVaccinated
+
+
+--Creating View to store data for Visualisations
+create view  PercentPopulationVaccinated  as
+ select da.continent,da.location, da.date,da.population ,va.new_vaccinations,
+ sum(convert(int,va.new_vaccinations)) over (partition by da.location order by da.date) as RollingpeopleVaccinated
+ from [Covid Exploration]..CovidDeaths da
+ join [Covid Exploration]..CovidVaccinations va
+ on da.location = va.location and da.date = va.date
+ where da.continent is not NULL
+
+
+ select * from PercentPopulationVaccinated
